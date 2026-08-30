@@ -1,0 +1,6 @@
+{
+  "name": "EcoSchool - Bank Sampah & Penukaran Poin Sekolah",
+  "description": "Aplikasi digital Bank Sampah Sekolah untuk pendaftaran siswa, QR wallet poin, penimbangan sampah terpilah oleh petugas OSIS/PMR, katalog penukaran reward, dan sinkronisasi database Google Sheets.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
