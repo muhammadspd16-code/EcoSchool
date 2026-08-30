@@ -202,6 +202,30 @@ export default function App() {
     setActiveTab('siswa');
   };
 
+  // Handler: Import users from CSV file
+  const handleImportUsers = (newUsers: User[], mode: 'append' | 'replace') => {
+    if (mode === 'replace') {
+      setUsers(newUsers);
+      if (newUsers.length > 0) {
+        setSelectedUser(newUsers[0]);
+      }
+    } else {
+      // Append or update existing by NISN / UserID
+      const userMap = new Map<string, User>();
+      users.forEach(u => userMap.set(u.NISN, u));
+      
+      newUsers.forEach(nu => {
+        userMap.set(nu.NISN, nu);
+      });
+
+      const mergedUsers = Array.from(userMap.values());
+      setUsers(mergedUsers);
+      if (!selectedUser && mergedUsers.length > 0) {
+        setSelectedUser(mergedUsers[0]);
+      }
+    }
+  };
+
   // Handler: Delete single user from database
   const handleDeleteUser = (userId: string) => {
     const updated = users.filter(u => u.UserID !== userId);
@@ -386,6 +410,7 @@ export default function App() {
                 onDeleteReward={handleDeleteReward}
                 onDeleteRedemption={handleDeleteRedemption}
                 onClearSheet={handleClearSheet}
+                onImportUsers={handleImportUsers}
               />
             </div>
           )}

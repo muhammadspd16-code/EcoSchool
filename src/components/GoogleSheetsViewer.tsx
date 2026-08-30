@@ -5,7 +5,7 @@ import {
   generateUsersCSV, 
   generateTransactionsCSV, 
   generateRewardsCSV, 
-  generateRedemptionsCSV,
+  generateRedemptionsCSV, 
   copyTableToClipboard 
 } from '../utils/exportUtils';
 import { 
@@ -20,9 +20,11 @@ import {
   Trash2,
   AlertTriangle,
   X,
-  QrCode
+  QrCode,
+  UploadCloud
 } from 'lucide-react';
 import { downloadStudentQRBadge } from '../utils/downloadCard';
+import { ImportUsersModal } from './ImportUsersModal';
 
 interface GoogleSheetsViewerProps {
   users: User[];
@@ -35,6 +37,7 @@ interface GoogleSheetsViewerProps {
   onDeleteReward?: (rewardId: string) => void;
   onDeleteRedemption?: (redemptionId: string) => void;
   onClearSheet?: (sheetName: 'Users' | 'Log_Transaksi' | 'Katalog_Reward' | 'Log_Penukaran') => void;
+  onImportUsers?: (newUsers: User[], mode: 'append' | 'replace') => void;
 }
 
 export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
@@ -48,10 +51,13 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
   onDeleteReward,
   onDeleteRedemption,
   onClearSheet,
+  onImportUsers,
 }) => {
   const [activeSheet, setActiveSheet] = useState<'Users' | 'Log_Transaksi' | 'Katalog_Reward' | 'Log_Penukaran'>('Users');
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importNotification, setImportNotification] = useState<string | null>(null);
   
   // Modal confirmation state for deletion
   const [deleteModal, setDeleteModal] = useState<{
@@ -212,6 +218,18 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
 
         {/* Global Sheet Actions */}
         <div className="flex items-center flex-wrap gap-2">
+          {/* Import CSV khusus Sheet 1: Users */}
+          {onImportUsers && (
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-100/90 text-emerald-900 border border-emerald-300 rounded-xl hover:bg-emerald-200 shadow-2xs transition-all active:scale-95 cursor-pointer"
+              title="Import data siswa dari file CSV ke Sheet 1: Users"
+            >
+              <UploadCloud className="w-4 h-4 text-emerald-700" />
+              <span>Import Data CSV (Sheet 1)</span>
+            </button>
+          )}
+
           {onOpenInstallModal && (
             <button
               onClick={onOpenInstallModal}
@@ -250,6 +268,22 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Import Success Banner */}
+      {importNotification && (
+        <div className="bg-emerald-900 text-emerald-100 px-4 py-3 rounded-2xl shadow-lg border border-emerald-500/50 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2.5">
+            <Check className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold">{importNotification}</span>
+          </div>
+          <button 
+            onClick={() => setImportNotification(null)}
+            className="text-xs text-emerald-300 hover:text-white underline cursor-pointer"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
 
       {/* Spreadsheet Workspace Simulation */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
@@ -368,19 +402,43 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
           
           {/* TAB 1: USERS */}
           {activeSheet === 'Users' && (
-            <table className="w-full text-left text-xs border-collapse font-mono">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
-                  <th className="p-3 border-r border-slate-200 text-center w-12 bg-slate-100/70">#</th>
-                  <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column A (UserID)</th>
-                  <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column B (NISN)</th>
-                  <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column C (Nama_Siswa)</th>
-                  <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column D (Kelas)</th>
-                  <th className="p-3 border-r border-slate-200 font-bold text-slate-700 text-right">Column E (Total_Poin)</th>
-                  <th className="p-3 border-r border-slate-200 font-bold text-slate-700 text-center w-28">Unduh QR</th>
-                  <th className="p-3 font-bold text-slate-700 text-center w-24">Aksi Hapus</th>
-                </tr>
-              </thead>
+            <div>
+              {/* Summary Stats Bar for Sheet 1 */}
+              <div className="bg-emerald-50/60 border-b border-emerald-100 px-4 py-2.5 flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-4 text-emerald-950 font-sans">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                    Total Siswa Terdaftar: <strong className="text-emerald-800 text-sm font-black">{users.length} Siswa</strong>
+                  </span>
+                  <span className="text-slate-400 hidden sm:inline">•</span>
+                  <span className="text-slate-600 hidden sm:inline">
+                    Total Saldo Poin: <strong className="text-emerald-700 font-bold">{users.reduce((acc, u) => acc + (u.Total_Poin || 0), 0).toLocaleString()} Pts</strong>
+                  </span>
+                  <span className="text-slate-400 hidden md:inline">•</span>
+                  <span className="text-slate-600 hidden md:inline">
+                    Kelas Terdata: <strong className="text-slate-800 font-bold">{Array.from(new Set(users.map(u => u.Kelas))).length} Kelas</strong>
+                  </span>
+                </div>
+                {searchTerm && (
+                  <span className="text-slate-500 font-sans text-[11px]">
+                    Menampilkan <strong>{filteredUsers.length}</strong> dari {users.length} siswa
+                  </span>
+                )}
+              </div>
+
+              <table className="w-full text-left text-xs border-collapse font-mono">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
+                    <th className="p-3 border-r border-slate-200 text-center w-12 bg-slate-100/70">#</th>
+                    <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column A (UserID)</th>
+                    <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column B (NISN)</th>
+                    <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column C (Nama_Siswa)</th>
+                    <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column D (Kelas)</th>
+                    <th className="p-3 border-r border-slate-200 font-bold text-slate-700 text-right">Column E (Total_Poin)</th>
+                    <th className="p-3 border-r border-slate-200 font-bold text-slate-700 text-center w-28">Unduh QR</th>
+                    <th className="p-3 font-bold text-slate-700 text-center w-24">Aksi Hapus</th>
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredUsers.length === 0 ? (
                   <tr>
@@ -439,6 +497,7 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
                 )}
               </tbody>
             </table>
+            </div>
           )}
 
           {/* TAB 2: LOG_TRANSAKSI */}
@@ -718,6 +777,22 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* CSV Import Modal for Sheet 1: Users */}
+      {onImportUsers && (
+        <ImportUsersModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          existingUsers={users}
+          onImportUsers={(newUsers, mode) => {
+            onImportUsers(newUsers, mode);
+            setImportNotification(
+              `Berhasil mengimpor ${newUsers.length} data siswa ke Sheet 1: Users (${mode === 'replace' ? 'Menimpa data lama' : 'Menambahkan ke data yang ada'})`
+            );
+            setTimeout(() => setImportNotification(null), 5000);
+          }}
+        />
       )}
     </div>
   );
