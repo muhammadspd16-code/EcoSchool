@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, LogTransaksi, LogPenukaran } from '../types';
 import { generateQRDataUrl } from '../utils/qrUtils';
+import { downloadStudentCardImage, downloadStudentQRBadge } from '../utils/downloadCard';
+import { EcoSchoolLogo } from './EcoSchoolLogo';
 import { 
   QrCode, 
   Wallet, 
@@ -12,7 +14,13 @@ import {
   Award,
   Sparkles,
   Copy,
-  Check
+  Check,
+  Download,
+  Search,
+  CheckCircle2,
+  FileImage,
+  ExternalLink,
+  Share2
 } from 'lucide-react';
 
 interface StudentCardProps {
@@ -36,6 +44,12 @@ export const StudentCard: React.FC<StudentCardProps> = ({
 }) => {
   const [qrUrl, setQrUrl] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDownloadingCard, setIsDownloadingCard] = useState(false);
+  const [isDownloadingQR, setIsDownloadingQR] = useState(false);
+  const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
+
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Generate QR with standard payload
@@ -64,9 +78,61 @@ export const StudentCard: React.FC<StudentCardProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handleDownloadFullCard = async () => {
+    if (!cardRef.current) return;
+    setIsDownloadingCard(true);
+    try {
+      const success = await downloadStudentCardImage(cardRef.current, currentUser);
+      if (success) {
+        setDownloadSuccessMsg(`Kartu ID ${currentUser.Nama_Siswa} berhasil diunduh!`);
+        setTimeout(() => setDownloadSuccessMsg(null), 4000);
+      }
+    } finally {
+      setIsDownloadingCard(false);
+    }
+  };
+
+  const handleDownloadQRBadge = async () => {
+    setIsDownloadingQR(true);
+    try {
+      const success = await downloadStudentQRBadge(currentUser);
+      if (success) {
+        setDownloadSuccessMsg(`QR Code Siswa ${currentUser.Nama_Siswa} berhasil diunduh!`);
+        setTimeout(() => setDownloadSuccessMsg(null), 4000);
+      }
+    } finally {
+      setIsDownloadingQR(false);
+    }
+  };
+
+  // Filtered users for quick search
+  const searchResults = searchQuery.trim()
+    ? users.filter(u => 
+        u.Nama_Siswa.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.NISN.includes(searchQuery) ||
+        u.Kelas.toLowerCase().includes(searchQuery.toLowerCase())
+      ).slice(0, 5)
+    : [];
+
   return (
     <div className="space-y-6">
-      {/* 3 Metric Stat Cards (Sleek Theme Archetype) */}
+      {/* Download Alert Toast */}
+      {downloadSuccessMsg && (
+        <div className="bg-emerald-900 text-emerald-100 px-4 py-3 rounded-2xl shadow-lg border border-emerald-500/50 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold">{downloadSuccessMsg}</span>
+          </div>
+          <button 
+            onClick={() => setDownloadSuccessMsg(null)}
+            className="text-xs text-emerald-300 hover:text-white underline cursor-pointer"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
+      {/* 3 Metric Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
           <div className="text-slate-400 text-xs font-bold uppercase mb-2">Saldo Poin Aktif</div>
@@ -102,41 +168,84 @@ export const StudentCard: React.FC<StudentCardProps> = ({
         </div>
       </div>
 
-      {/* Student Selector Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center font-bold">
-            <Wallet className="w-5 h-5" />
+      {/* Student Selector Bar & Quick Search */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center font-bold">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Profil Akun Siswa Aktif
+              </div>
+              <div className="text-base font-bold text-slate-900">
+                {currentUser.Nama_Siswa} <span className="text-slate-400 font-medium">({currentUser.Kelas})</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Profil Akun Siswa Aktif
-            </div>
-            <div className="text-base font-bold text-slate-900">
-              {currentUser.Nama_Siswa} <span className="text-slate-400 font-medium">({currentUser.Kelas})</span>
-            </div>
+
+          <div className="flex items-center gap-3">
+            <label htmlFor="student-select" className="text-xs font-bold text-slate-500 whitespace-nowrap">
+              Pilih Siswa:
+            </label>
+            <select
+              id="student-select"
+              value={currentUser.NISN}
+              onChange={(e) => {
+                const selected = users.find(u => u.NISN === e.target.value);
+                if (selected) onSelectUser(selected);
+              }}
+              className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-800 cursor-pointer shadow-2xs"
+            >
+              {users.map(u => (
+                <option key={u.NISN} value={u.NISN}>
+                  {u.Nama_Siswa} - {u.Kelas} ({u.Total_Poin} Pts)
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label htmlFor="student-select" className="text-xs font-bold text-slate-500 whitespace-nowrap">
-            Ganti Siswa:
-          </label>
-          <select
-            id="student-select"
-            value={currentUser.NISN}
-            onChange={(e) => {
-              const selected = users.find(u => u.NISN === e.target.value);
-              if (selected) onSelectUser(selected);
-            }}
-            className="text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-800 cursor-pointer shadow-2xs"
-          >
-            {users.map(u => (
-              <option key={u.NISN} value={u.NISN}>
-                {u.Nama_Siswa} - {u.Kelas} ({u.Total_Poin} Poin)
-              </option>
-            ))}
-          </select>
+        {/* Quick search input for students finding their own account */}
+        <div className="pt-2 border-t border-slate-100">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Cari akun siswa berdasarkan Nama / NISN untuk download QR..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-800 placeholder-slate-400"
+            />
+          </div>
+
+          {/* Search Dropdown Results */}
+          {searchResults.length > 0 && (
+            <div className="mt-2 p-1.5 bg-slate-50 border border-slate-200 rounded-2xl divide-y divide-slate-100 shadow-sm">
+              {searchResults.map(u => (
+                <button
+                  key={u.NISN}
+                  onClick={() => {
+                    onSelectUser(u);
+                    setSearchQuery('');
+                  }}
+                  className={`w-full p-2 text-left rounded-xl flex items-center justify-between text-xs transition-colors ${
+                    u.NISN === currentUser.NISN 
+                      ? 'bg-emerald-100/70 text-emerald-900 font-bold' 
+                      : 'hover:bg-white text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{u.Nama_Siswa}</span>
+                    <span className="text-[10px] text-slate-400">({u.Kelas})</span>
+                    <span className="font-mono text-[10px] bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-600">NISN: {u.NISN}</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700">Pilih & Unduh QR →</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -145,7 +254,11 @@ export const StudentCard: React.FC<StudentCardProps> = ({
         
         {/* Left: The Virtual Digital Student Card */}
         <div className="lg:col-span-5 flex flex-col space-y-4">
-          <div className="relative overflow-hidden rounded-3xl bg-emerald-950 text-white p-6 shadow-xl border border-emerald-800/40 flex flex-col justify-between min-h-[380px]">
+          {/* Card to be downloaded as image */}
+          <div 
+            ref={cardRef}
+            className="relative overflow-hidden rounded-3xl bg-emerald-950 text-white p-6 shadow-xl border border-emerald-800/40 flex flex-col justify-between min-h-[380px]"
+          >
             {/* Background Glow */}
             <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none" />
             <div className="absolute right-4 top-4 opacity-10 pointer-events-none">
@@ -154,16 +267,19 @@ export const StudentCard: React.FC<StudentCardProps> = ({
 
             {/* Top Header of Card */}
             <div className="flex items-start justify-between relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-400 text-emerald-950 flex items-center justify-center font-bold text-lg shadow-md shadow-emerald-400/20">
-                  E
-                </div>
+              <div className="flex items-center gap-2.5">
+                <EcoSchoolLogo size={38} variant="icon" />
                 <div>
-                  <h3 className="font-extrabold text-base tracking-tight text-white">EcoSchool</h3>
-                  <p className="text-[11px] text-emerald-300 font-semibold">SMAN 2 Banjarmasin • Bank Sampah</p>
+                  <h3 className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
+                    Eco<span className="text-emerald-400">School</span>
+                    <span className="text-[9px] font-bold bg-emerald-400/20 text-emerald-300 px-1.5 py-0.5 rounded-full border border-emerald-400/30">
+                      ID CARD
+                    </span>
+                  </h3>
+                  <p className="text-[10px] text-emerald-300 font-semibold">SMAN 2 Banjarmasin • Bank Sampah</p>
                 </div>
               </div>
-              <span className="text-[11px] font-mono font-bold bg-emerald-900/80 px-3 py-1 rounded-full border border-emerald-700/60 text-emerald-300">
+              <span className="text-[11px] font-mono font-bold bg-emerald-900/80 px-2.5 py-1 rounded-full border border-emerald-700/60 text-emerald-300">
                 {currentUser.UserID}
               </span>
             </div>
@@ -233,7 +349,7 @@ export const StudentCard: React.FC<StudentCardProps> = ({
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={handleCopyNISN}
-                  className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-900/80 hover:bg-emerald-800 text-white rounded-xl border border-emerald-700/60 transition-colors flex items-center gap-1"
+                  className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-900/80 hover:bg-emerald-800 text-white rounded-xl border border-emerald-700/60 transition-colors flex items-center gap-1 cursor-pointer"
                   title="Salin NISN"
                 >
                   {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -241,7 +357,7 @@ export const StudentCard: React.FC<StudentCardProps> = ({
                 </button>
                 <button
                   onClick={handlePrintCard}
-                  className="p-2 bg-emerald-900/80 hover:bg-emerald-800 text-white rounded-xl border border-emerald-700/60 transition-colors"
+                  className="p-2 bg-emerald-900/80 hover:bg-emerald-800 text-white rounded-xl border border-emerald-700/60 transition-colors cursor-pointer"
                   title="Cetak Kartu Siswa"
                 >
                   <Printer className="w-4 h-4" />
@@ -250,18 +366,62 @@ export const StudentCard: React.FC<StudentCardProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons under Card */}
+          {/* Download Buttons for Student QR & ID Card */}
+          <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase text-emerald-900 tracking-wider flex items-center gap-1.5">
+                <Download className="w-3.5 h-3.5 text-emerald-700" />
+                Unduh Kartu & QR Siswa
+              </span>
+              <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-100 px-2 py-0.5 rounded-full">
+                Format PNG HD
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleDownloadFullCard}
+                disabled={isDownloadingCard}
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-emerald-700 hover:bg-emerald-800 active:scale-98 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-60"
+              >
+                {isDownloadingCard ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <FileImage className="w-3.5 h-3.5" />
+                )}
+                <span>{isDownloadingCard ? 'Memproses...' : 'Unduh Kartu ID'}</span>
+              </button>
+
+              <button
+                onClick={handleDownloadQRBadge}
+                disabled={isDownloadingQR}
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-white hover:bg-emerald-100/60 active:scale-98 text-emerald-900 border border-emerald-300 text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-60"
+              >
+                {isDownloadingQR ? (
+                  <div className="w-3.5 h-3.5 border-2 border-emerald-700 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <QrCode className="w-3.5 h-3.5 text-emerald-700" />
+                )}
+                <span>{isDownloadingQR ? 'Memproses...' : 'Unduh QR Saja'}</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500 text-center">
+              Simpan gambar ini di galeri HP atau cetak untuk ditunjukkan saat setor sampah.
+            </p>
+          </div>
+
+          {/* Action Navigation Buttons under Card */}
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => onGoToDeposit(currentUser)}
-              className="flex items-center justify-center gap-2 p-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-sm transition-all active:scale-95"
+              className="flex items-center justify-center gap-2 p-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-sm transition-all active:scale-95 cursor-pointer"
             >
               <Recycle className="w-4 h-4" />
               <span>Setor Sampah</span>
             </button>
             <button
               onClick={onGoToRewards}
-              className="flex items-center justify-center gap-2 p-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-bold text-xs rounded-2xl shadow-sm transition-all active:scale-95"
+              className="flex items-center justify-center gap-2 p-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 font-bold text-xs rounded-2xl shadow-sm transition-all active:scale-95 cursor-pointer"
             >
               <Award className="w-4 h-4 text-emerald-600" />
               <span>Katalog Hadiah</span>
@@ -291,7 +451,7 @@ export const StudentCard: React.FC<StudentCardProps> = ({
                   <p className="text-xs font-semibold">Belum ada aktivitas penyetoran sampah.</p>
                   <button
                     onClick={() => onGoToDeposit(currentUser)}
-                    className="mt-3 text-xs font-bold text-emerald-600 hover:text-emerald-700 underline"
+                    className="mt-3 text-xs font-bold text-emerald-600 hover:text-emerald-700 underline cursor-pointer"
                   >
                     Mulai Setor Sekarang →
                   </button>

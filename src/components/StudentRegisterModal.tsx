@@ -157,7 +157,7 @@ export const StudentRegisterModal: React.FC<StudentRegisterModalProps> = ({
                     <option key={k} value={k}>{k}</option>
                   ))}
                 </optgroup>
-                <optgroup label="── KELAS XI (XI A1 s/d XI F12) ──">
+                <optgroup label="── KELAS XI (XI A1 s/d XI F10) ──">
                   {KELAS_XI.map(k => (
                     <option key={k} value={k}>{k}</option>
                   ))}

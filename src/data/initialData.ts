@@ -3,24 +3,34 @@ import { User, LogTransaksi, RewardItem, LogPenukaran, WasteType } from '../type
 // Kelas X: X-1 s/d X-13
 export const KELAS_X = Array.from({ length: 13 }, (_, i) => `X-${i + 1}`);
 
-// Kelas XI: XI A1 s/d XI F12
+// Kelas XI: XI A1, XI A2, XI B3, XI C4, XI C5, XI D6, XI D7, XI D8, XI E9, XI F10
 export const KELAS_XI = [
-  ...Array.from({ length: 12 }, (_, i) => `XI A${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XI B${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XI C${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XI D${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XI E${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XI F${i + 1}`),
+  'XI A1',
+  'XI A2',
+  'XI B3',
+  'XI C4',
+  'XI C5',
+  'XI D6',
+  'XI D7',
+  'XI D8',
+  'XI E9',
+  'XI F10',
 ];
 
-// Kelas XII: XII A1 s/d XII F12
+// Kelas XII: XII A1, XII A2, XII A3, XII B4, XII C5, XII D6, XII E7, XII E8, XII E9, XII E10, XII F11, XII F12
 export const KELAS_XII = [
-  ...Array.from({ length: 12 }, (_, i) => `XII A${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XII B${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XII C${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XII D${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XII E${i + 1}`),
-  ...Array.from({ length: 12 }, (_, i) => `XII F${i + 1}`),
+  'XII A1',
+  'XII A2',
+  'XII A3',
+  'XII B4',
+  'XII C5',
+  'XII D6',
+  'XII E7',
+  'XII E8',
+  'XII E9',
+  'XII E10',
+  'XII F11',
+  'XII F12',
 ];
 
 export const ALL_SCHOOL_CLASSES = [...KELAS_X, ...KELAS_XI, ...KELAS_XII];

@@ -18,9 +18,10 @@ import { QRScannerModal } from './components/QRScannerModal';
 import { WasteDepositForm } from './components/WasteDepositForm';
 import { RewardCatalog } from './components/RewardCatalog';
 import { GoogleSheetsViewer } from './components/GoogleSheetsViewer';
-import { AppSheetGuideModal } from './components/AppSheetGuideModal';
+import { InstallAppModal } from './components/InstallAppModal';
 import { StudentRegisterModal } from './components/StudentRegisterModal';
 import { ReceiptModal } from './components/ReceiptModal';
+import { ResetConfirmModal } from './components/ResetConfirmModal';
 import { EcoImpactDashboard } from './components/EcoImpactDashboard';
 import { QRScannerView } from './components/QRScannerView';
 
@@ -58,9 +59,21 @@ export default function App() {
   // Modals
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [isAppSheetGuideOpen, setIsAppSheetGuideOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [receiptTrx, setReceiptTrx] = useState<LogTransaksi | null>(null);
   const [receiptUser, setReceiptUser] = useState<User | null>(null);
+
+  // Capture PWA beforeinstallprompt event for Android
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
@@ -243,15 +256,16 @@ export default function App() {
   };
 
   // Handler: Reset to factory default mock data
-  const handleResetData = () => {
-    if (confirm('Apakah Anda yakin ingin mereset seluruh database kembali ke data awal lomba?')) {
-      localStorage.clear();
-      setUsers(INITIAL_USERS);
-      setTransactions(INITIAL_TRANSACTIONS);
-      setRewards(INITIAL_REWARDS);
-      setRedemptions(INITIAL_REDEMPTIONS);
-      setSelectedUser(INITIAL_USERS[0]);
-    }
+  const handleExecuteReset = () => {
+    localStorage.removeItem('ecoschool_users');
+    localStorage.removeItem('ecoschool_transactions');
+    localStorage.removeItem('ecoschool_rewards');
+    localStorage.removeItem('ecoschool_redemptions');
+    setUsers(INITIAL_USERS);
+    setTransactions(INITIAL_TRANSACTIONS);
+    setRewards(INITIAL_REWARDS);
+    setRedemptions(INITIAL_REDEMPTIONS);
+    setSelectedUser(INITIAL_USERS[0]);
   };
 
   return (
@@ -264,8 +278,6 @@ export default function App() {
         totalTransactionsCount={transactions.length}
         isMobileOpen={isMobileMenuOpen}
         setIsMobileOpen={setIsMobileMenuOpen}
-        onOpenRegister={() => setIsRegisterOpen(true)}
-        onOpenAppSheetGuide={() => setIsAppSheetGuideOpen(true)}
       />
 
       {/* Main View Area */}
@@ -276,8 +288,8 @@ export default function App() {
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
           onOpenRegister={() => setIsRegisterOpen(true)}
           onOpenScanner={() => setIsScannerOpen(true)}
-          onOpenAppSheetGuide={() => setIsAppSheetGuideOpen(true)}
-          onResetData={handleResetData}
+          onOpenInstallModal={() => setIsInstallModalOpen(true)}
+          onResetData={() => setIsResetModalOpen(true)}
           totalWeightKg={totalWeightKg}
           selectedUser={selectedUser}
         />
@@ -360,7 +372,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Tab 3: Google Sheets Database (3 Tab) */}
+          {/* Tab 3: Google Sheets Database (4 Tab) */}
           {activeTab === 'sheets' && (
             <div className="max-w-7xl mx-auto">
               <GoogleSheetsViewer
@@ -368,7 +380,7 @@ export default function App() {
                 transactions={transactions}
                 rewards={rewards}
                 redemptions={redemptions}
-                onOpenAppSheetGuide={() => setIsAppSheetGuideOpen(true)}
+                onOpenInstallModal={() => setIsInstallModalOpen(true)}
                 onDeleteUser={handleDeleteUser}
                 onDeleteTransaction={handleDeleteTransaction}
                 onDeleteReward={handleDeleteReward}
@@ -425,9 +437,12 @@ export default function App() {
         existingUsers={users}
       />
 
-      <AppSheetGuideModal
-        isOpen={isAppSheetGuideOpen}
-        onClose={() => setIsAppSheetGuideOpen(false)}
+      {/* Install App on Android Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+        onInstallSuccess={() => setIsInstallModalOpen(false)}
       />
 
       <ReceiptModal
@@ -435,6 +450,13 @@ export default function App() {
         student={receiptUser}
         isOpen={!!receiptTrx}
         onClose={() => setReceiptTrx(null)}
+      />
+
+      {/* Reset Database Confirmation Modal */}
+      <ResetConfirmModal
+        isOpen={isResetModalOpen}
+        onClose={() => setIsResetModalOpen(false)}
+        onConfirm={handleExecuteReset}
       />
     </div>
   );

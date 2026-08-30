@@ -19,15 +19,17 @@ import {
   FileDown,
   Trash2,
   AlertTriangle,
-  X
+  X,
+  QrCode
 } from 'lucide-react';
+import { downloadStudentQRBadge } from '../utils/downloadCard';
 
 interface GoogleSheetsViewerProps {
   users: User[];
   transactions: LogTransaksi[];
   rewards: RewardItem[];
   redemptions: LogPenukaran[];
-  onOpenAppSheetGuide: () => void;
+  onOpenInstallModal?: () => void;
   onDeleteUser?: (userId: string) => void;
   onDeleteTransaction?: (trxId: string) => void;
   onDeleteReward?: (rewardId: string) => void;
@@ -40,7 +42,7 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
   transactions,
   rewards,
   redemptions,
-  onOpenAppSheetGuide,
+  onOpenInstallModal,
   onDeleteUser,
   onDeleteTransaction,
   onDeleteReward,
@@ -210,13 +212,15 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
 
         {/* Global Sheet Actions */}
         <div className="flex items-center flex-wrap gap-2">
-          <button
-            onClick={onOpenAppSheetGuide}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200 rounded-xl hover:bg-teal-100 transition-colors cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            <span>Panduan AppSheet Lomba</span>
-          </button>
+          {onOpenInstallModal && (
+            <button
+              onClick={onOpenInstallModal}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200 rounded-xl hover:bg-teal-100 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-teal-600" />
+              <span>Instal App di Android</span>
+            </button>
+          )}
 
           <button
             onClick={handleCopyClipboard}
@@ -373,13 +377,14 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
                   <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column C (Nama_Siswa)</th>
                   <th className="p-3 border-r border-slate-200 font-bold text-slate-700">Column D (Kelas)</th>
                   <th className="p-3 border-r border-slate-200 font-bold text-slate-700 text-right">Column E (Total_Poin)</th>
+                  <th className="p-3 border-r border-slate-200 font-bold text-slate-700 text-center w-28">Unduh QR</th>
                   <th className="p-3 font-bold text-slate-700 text-center w-24">Aksi Hapus</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-400 font-sans">
+                    <td colSpan={8} className="p-8 text-center text-slate-400 font-sans">
                       Tidak ada data siswa ditemukan.
                     </td>
                   </tr>
@@ -403,6 +408,16 @@ export const GoogleSheetsViewer: React.FC<GoogleSheetsViewerProps> = ({
                       </td>
                       <td className="p-3 border-r border-slate-100 font-bold text-emerald-700 text-right">
                         {u.Total_Poin}
+                      </td>
+                      <td className="p-2 border-r border-slate-100 text-center">
+                        <button
+                          onClick={() => downloadStudentQRBadge(u)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/80 hover:bg-emerald-200 rounded-lg transition-colors cursor-pointer"
+                          title={`Unduh gambar QR code untuk ${u.Nama_Siswa}`}
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Unduh QR</span>
+                        </button>
                       </td>
                       <td className="p-2.5 text-center">
                         <button

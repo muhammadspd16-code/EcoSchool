@@ -1,22 +1,24 @@
 import React from 'react';
 import { 
   Menu, 
-  BookOpenCheck, 
+  Download, 
   UserPlus, 
   RotateCcw,
   Sparkles,
   Award,
   Camera,
-  QrCode
+  QrCode,
+  Smartphone
 } from 'lucide-react';
 import { User } from '../types';
+import { EcoSchoolLogo } from './EcoSchoolLogo';
 
 interface HeaderProps {
   activeTab: 'siswa' | 'petugas' | 'scanner' | 'sheets' | 'analytics';
   onOpenMobileMenu: () => void;
   onOpenRegister: () => void;
   onOpenScanner: () => void;
-  onOpenAppSheetGuide: () => void;
+  onOpenInstallModal: () => void;
   onResetData: () => void;
   totalWeightKg: string;
   selectedUser: User;
@@ -27,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMobileMenu,
   onOpenRegister,
   onOpenScanner,
-  onOpenAppSheetGuide,
+  onOpenInstallModal,
   onResetData,
   totalWeightKg,
   selectedUser,
@@ -86,17 +88,22 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex flex-col">
-          <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-            {info.title}
-          </h1>
-          <p className="text-xs text-slate-500 hidden sm:block">
-            {today} • SMAN 2 Banjarmasin • <span className="text-emerald-700 font-medium">{info.subtitle}</span>
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block">
+            <EcoSchoolLogo size={42} variant="icon" />
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+              {info.title}
+            </h1>
+            <p className="text-xs text-slate-500 hidden sm:block">
+              {today} • SMAN 2 Banjarmasin • <span className="text-emerald-700 font-medium">{info.subtitle}</span>
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 sm:gap-6">
+      <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
         {/* Metric Highlight */}
         <div className="hidden lg:flex flex-col items-end">
           <span className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
@@ -115,16 +122,17 @@ export const Header: React.FC<HeaderProps> = ({
             title="Buka Kamera Scanner QR Siswa"
           >
             <Camera className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Scanner QR</span>
+            <span className="hidden sm:inline">Scanner QR</span>
           </button>
 
           <button
-            onClick={onOpenAppSheetGuide}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors cursor-pointer"
-            title="Panduan Google AppSheet"
+            onClick={onOpenInstallModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            title="Instal Aplikasi di HP Android"
           >
-            <BookOpenCheck className="w-3.5 h-3.5 text-teal-600" />
-            <span>Panduan AppSheet</span>
+            <Download className="w-3.5 h-3.5 text-teal-600" />
+            <span className="hidden sm:inline">Instal App di Android</span>
+            <span className="sm:hidden">Instal App</span>
           </button>
 
           <button
@@ -138,21 +146,12 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={onResetData}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
-            title="Reset Data ke Default Lomba"
+            className="p-2 text-slate-500 hover:text-emerald-700 bg-slate-100/80 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="Muat Ulang / Reset Data ke Kondisi Awal"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4 text-slate-600 hover:text-emerald-700" />
+            <span className="hidden xl:inline text-xs font-semibold">Reset</span>
           </button>
-        </div>
-
-        {/* User Avatar with initials */}
-        <div 
-          className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-slate-200"
-          title={`Siswa Aktif: ${selectedUser.Nama_Siswa} (${selectedUser.Kelas})`}
-        >
-          <div className="w-9 h-9 rounded-full bg-emerald-100 border-2 border-emerald-500/20 text-emerald-800 font-bold text-xs flex items-center justify-center shadow-xs">
-            {selectedUser.Nama_Siswa.charAt(0)}
-          </div>
         </div>
       </div>
     </header>
