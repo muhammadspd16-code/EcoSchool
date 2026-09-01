@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "users": {
+      "title": "User",
+      "description": "Student bank sampah members",
+      "fields": {
+        "UserID": { "type": "string", "description": "Unique user ID" },
+        "NISN": { "type": "string", "description": "Student NISN" },
+        "Nama_Siswa": { "type": "string", "description": "Student full name" },
+        "Kelas": { "type": "string", "description": "Student class" },
+        "Total_Poin": { "type": "number", "description": "Accumulated points balance" }
+      }
+    },
+    "transactions": {
+      "title": "Transaction",
+      "description": "Waste scale and deposit logs",
+      "fields": {
+        "ID_Transaksi": { "type": "string", "description": "Transaction ID" },
+        "Tanggal": { "type": "string", "description": "Transaction date time" },
+        "UserID": { "type": "string", "description": "User ID" },
+        "NISN": { "type": "string", "description": "Student NISN" },
+        "Nama_Siswa": { "type": "string", "description": "Student name" },
+        "Jenis_Sampah": { "type": "string", "description": "Waste category" },
+        "Berat_Kg": { "type": "number", "description": "Waste weight in kg" },
+        "Poin_Didapat": { "type": "number", "description": "Points earned" },
+        "Petugas": { "type": "string", "description": "Officer / operator" }
+      }
+    },
+    "rewards": {
+      "title": "Reward",
+      "description": "Reward catalog items",
+      "fields": {
+        "ID_Reward": { "type": "string", "description": "Reward item ID" },
+        "Nama_Reward": { "type": "string", "description": "Reward name" },
+        "Kategori": { "type": "string", "description": "Category" },
+        "Poin_Dibutuhkan": { "type": "number", "description": "Points required" },
+        "Stok": { "type": "number", "description": "Available stock" }
+      }
+    },
+    "redemptions": {
+      "title": "Redemption",
+      "description": "Reward redemption logs",
+      "fields": {
+        "ID_Penukaran": { "type": "string", "description": "Redemption ID" },
+        "Tanggal": { "type": "string", "description": "Redemption date time" },
+        "UserID": { "type": "string", "description": "User ID" },
+        "Nama_Siswa": { "type": "string", "description": "Student name" },
+        "ID_Reward": { "type": "string", "description": "Reward item ID" },
+        "Nama_Reward": { "type": "string", "description": "Reward name" },
+        "Poin_Dipakai": { "type": "number", "description": "Points used" },
+        "Status": { "type": "string", "description": "Redemption status" },
+        "Petugas": { "type": "string", "description": "Officer / operator" }
+      }
+    }
+  }
+}

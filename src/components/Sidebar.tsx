@@ -144,6 +144,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
+
+        {/* Cloud Database Status Footer */}
+        <div className="p-4 border-t border-emerald-900/60 bg-emerald-950/90">
+          <div className="bg-emerald-900/60 border border-emerald-500/30 rounded-2xl p-3 text-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 font-bold text-emerald-200 text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Database Publik Aktif
+              </span>
+              <span className="text-[9px] font-mono bg-emerald-800 text-emerald-300 px-1.5 py-0.5 rounded-md border border-emerald-700">
+                Firestore
+              </span>
+            </div>
+            <p className="text-[10px] text-emerald-300/80 leading-relaxed">
+              Data tersinkron otomatis antar HP, tablet, dan laptop secara publik & real-time.
+            </p>
+            <div className="pt-1 flex items-center justify-between text-[10px] text-emerald-300 border-t border-emerald-800/60 font-mono">
+              <span>{totalUsersCount} Siswa</span>
+              <span>{totalTransactionsCount} Transaksi</span>
+            </div>
+          </div>
+        </div>
       </aside>
     </>
   );

@@ -11,6 +11,23 @@ import {
   INITIAL_REWARDS, 
   INITIAL_REDEMPTIONS 
 } from './data/initialData';
+import {
+  seedInitialFirestoreIfEmpty,
+  subscribeToUsers,
+  subscribeToTransactions,
+  subscribeToRewards,
+  subscribeToRedemptions,
+  saveUserCloud,
+  bulkImportUsersCloud,
+  deleteUserCloud,
+  recordTransactionCloud,
+  deleteTransactionCloud,
+  recordRedemptionCloud,
+  deleteRedemptionCloud,
+  deleteRewardCloud,
+  clearSheetCloud,
+  resetDatabaseCloud,
+} from './services/firestoreService';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { StudentCard } from './components/StudentCard';
@@ -26,7 +43,7 @@ import { EcoImpactDashboard } from './components/EcoImpactDashboard';
 import { QRScannerView } from './components/QRScannerView';
 
 export default function App() {
-  // Persistence with localStorage
+  // Cloud Database state & local fallback
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('ecoschool_users');
     return saved ? JSON.parse(saved) : INITIAL_USERS;
@@ -46,6 +63,8 @@ export default function App() {
     const saved = localStorage.getItem('ecoschool_redemptions');
     return saved ? JSON.parse(saved) : INITIAL_REDEMPTIONS;
   });
+
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
 
   // Selected Student
   const [selectedUser, setSelectedUser] = useState<User>(() => users[0] || INITIAL_USERS[0]);
@@ -75,7 +94,70 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  // Sync to localStorage
+  // 1. Initial Firestore Setup and Realtime Sync Subscriptions
+  useEffect(() => {
+    let unsubUsers = () => {};
+    let unsubTrx = () => {};
+    let unsubRew = () => {};
+    let unsubRdm = () => {};
+
+    const initCloud = async () => {
+      try {
+        await seedInitialFirestoreIfEmpty();
+        setIsCloudConnected(true);
+
+        unsubUsers = subscribeToUsers(
+          (cloudUsers) => {
+            if (cloudUsers.length > 0) {
+              setUsers(cloudUsers);
+              localStorage.setItem('ecoschool_users', JSON.stringify(cloudUsers));
+            }
+          },
+          () => setIsCloudConnected(false)
+        );
+
+        unsubTrx = subscribeToTransactions(
+          (cloudTrx) => {
+            setTransactions(cloudTrx);
+            localStorage.setItem('ecoschool_transactions', JSON.stringify(cloudTrx));
+          },
+          () => setIsCloudConnected(false)
+        );
+
+        unsubRew = subscribeToRewards(
+          (cloudRewards) => {
+            if (cloudRewards.length > 0) {
+              setRewards(cloudRewards);
+              localStorage.setItem('ecoschool_rewards', JSON.stringify(cloudRewards));
+            }
+          },
+          () => setIsCloudConnected(false)
+        );
+
+        unsubRdm = subscribeToRedemptions(
+          (cloudRedemptions) => {
+            setRedemptions(cloudRedemptions);
+            localStorage.setItem('ecoschool_redemptions', JSON.stringify(cloudRedemptions));
+          },
+          () => setIsCloudConnected(false)
+        );
+      } catch (err) {
+        console.error('Inisialisasi koneksi Cloud Firestore:', err);
+        setIsCloudConnected(false);
+      }
+    };
+
+    initCloud();
+
+    return () => {
+      unsubUsers();
+      unsubTrx();
+      unsubRew();
+      unsubRdm();
+    };
+  }, []);
+
+  // Sync to localStorage as offline cache fallback
   useEffect(() => {
     localStorage.setItem('ecoschool_users', JSON.stringify(users));
   }, [users]);
@@ -94,18 +176,20 @@ export default function App() {
 
   // Keep selectedUser in sync with users list
   useEffect(() => {
-    const fresh = users.find(u => u.NISN === selectedUser?.NISN);
+    const fresh = users.find(u => u.NISN === selectedUser?.NISN || u.UserID === selectedUser?.UserID);
     if (fresh) {
       setSelectedUser(fresh);
+    } else if (users.length > 0 && !selectedUser) {
+      setSelectedUser(users[0]);
     }
   }, [users]);
 
   // Calculated total weight in Kg
-  const totalWeightGram = transactions.reduce((sum, t) => sum + t.Berat_Gram, 0);
+  const totalWeightGram = transactions.reduce((sum, t) => sum + (t.Berat_Gram || 0), 0);
   const totalWeightKg = (totalWeightGram / 1000).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   // Handler: Add waste deposit transaction
-  const handleAddTransaction = (newTrxData: Omit<LogTransaksi, 'ID_Transaksi' | 'Timestamp'>) => {
+  const handleAddTransaction = async (newTrxData: Omit<LogTransaksi, 'ID_Transaksi' | 'Timestamp'>) => {
     const nextTrxNum = transactions.length + 1;
     const trxId = `TRX-${String(nextTrxNum).padStart(3, '0')}`;
     
@@ -118,30 +202,38 @@ export default function App() {
       ...newTrxData,
     };
 
-    // 1. Append transaction
+    // 1. Optimistic Local State Update
     const updatedTransactions = [newTransaction, ...transactions];
     setTransactions(updatedTransactions);
 
-    // 2. Update user's total points
+    let studentToUpdate: User | undefined;
     const updatedUsers = users.map(u => {
       if (u.NISN === newTrxData.NISN_Siswa) {
-        return {
+        studentToUpdate = {
           ...u,
           Total_Poin: u.Total_Poin + newTrxData.Poin_Didapat,
         };
+        return studentToUpdate;
       }
       return u;
     });
     setUsers(updatedUsers);
 
-    // 3. Show digital receipt
-    const userForReceipt = updatedUsers.find(u => u.NISN === newTrxData.NISN_Siswa) || selectedUser;
+    // 2. Show digital receipt
+    const userForReceipt = studentToUpdate || selectedUser;
     setReceiptTrx(newTransaction);
     setReceiptUser(userForReceipt);
+
+    // 3. Persist to Cloud Firestore Public DB
+    try {
+      await recordTransactionCloud(newTransaction, studentToUpdate);
+    } catch (err) {
+      console.error('Gagal menyimpan transaksi ke Cloud Firestore:', err);
+    }
   };
 
   // Handler: Redeem reward item
-  const handleRedeemReward = (reward: RewardItem, student: User) => {
+  const handleRedeemReward = async (reward: RewardItem, student: User) => {
     if (student.Total_Poin < reward.Poin_Dibutuhkan) return;
 
     const nextRdmNum = redemptions.length + 1;
@@ -150,7 +242,6 @@ export default function App() {
     const now = new Date();
     const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
-    // Unique random claim code e.g. ECO-KANTIN-8421
     const randomCode = Math.floor(1000 + Math.random() * 9000);
     const claimCode = `ECO-${reward.Kategori.toUpperCase().replace(/\s+/g, '')}-${randomCode}`;
 
@@ -167,50 +258,48 @@ export default function App() {
     };
 
     // 1. Deduct user points
-    const updatedUsers = users.map(u => {
-      if (u.NISN === student.NISN) {
-        return {
-          ...u,
-          Total_Poin: Math.max(0, u.Total_Poin - reward.Poin_Dibutuhkan),
-        };
-      }
-      return u;
-    });
+    let updatedStudent = { ...student, Total_Poin: Math.max(0, student.Total_Poin - reward.Poin_Dibutuhkan) };
+    const updatedUsers = users.map(u => (u.NISN === student.NISN ? updatedStudent : u));
     setUsers(updatedUsers);
 
     // 2. Decrement reward stock
-    const updatedRewards = rewards.map(r => {
-      if (r.RewardID === reward.RewardID) {
-        return {
-          ...r,
-          Stok: Math.max(0, r.Stok - 1),
-        };
-      }
-      return r;
-    });
+    let updatedReward = { ...reward, Stok: Math.max(0, reward.Stok - 1) };
+    const updatedRewards = rewards.map(r => (r.RewardID === reward.RewardID ? updatedReward : r));
     setRewards(updatedRewards);
 
     // 3. Append to redemptions log
     setRedemptions([newRedemption, ...redemptions]);
+
+    // 4. Persist to Cloud Firestore
+    try {
+      await recordRedemptionCloud(newRedemption, updatedStudent, updatedReward);
+    } catch (err) {
+      console.error('Gagal mencatat penukaran reward ke Cloud Firestore:', err);
+    }
   };
 
   // Handler: Register new student
-  const handleRegisterUser = (newUser: User) => {
+  const handleRegisterUser = async (newUser: User) => {
     const updated = [...users, newUser];
     setUsers(updated);
     setSelectedUser(newUser);
     setActiveTab('siswa');
+
+    try {
+      await saveUserCloud(newUser);
+    } catch (err) {
+      console.error('Gagal mendaftarkan siswa ke Cloud Firestore:', err);
+    }
   };
 
   // Handler: Import users from CSV file
-  const handleImportUsers = (newUsers: User[], mode: 'append' | 'replace') => {
+  const handleImportUsers = async (newUsers: User[], mode: 'append' | 'replace') => {
     if (mode === 'replace') {
       setUsers(newUsers);
       if (newUsers.length > 0) {
         setSelectedUser(newUsers[0]);
       }
     } else {
-      // Append or update existing by NISN / UserID
       const userMap = new Map<string, User>();
       users.forEach(u => userMap.set(u.NISN, u));
       
@@ -224,10 +313,18 @@ export default function App() {
         setSelectedUser(mergedUsers[0]);
       }
     }
+
+    // Persist all imported users to Cloud Firestore Public DB
+    try {
+      await bulkImportUsersCloud(newUsers, mode);
+    } catch (err) {
+      console.error('Gagal mengimpor siswa ke Cloud Firestore:', err);
+    }
   };
 
   // Handler: Delete single user from database
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
+    const target = users.find(u => u.UserID === userId);
     const updated = users.filter(u => u.UserID !== userId);
     setUsers(updated);
     if (selectedUser?.UserID === userId) {
@@ -235,39 +332,62 @@ export default function App() {
         setSelectedUser(updated[0]);
       }
     }
+
+    try {
+      await deleteUserCloud(userId, target?.NISN);
+    } catch (err) {
+      console.error('Gagal menghapus user dari Cloud Firestore:', err);
+    }
   };
 
   // Handler: Delete single transaction
-  const handleDeleteTransaction = (trxId: string) => {
+  const handleDeleteTransaction = async (trxId: string) => {
     const trxToDelete = transactions.find(t => t.ID_Transaksi === trxId);
     if (trxToDelete) {
-      // Deduct points that were given in this transaction
       const updatedUsers = users.map(u => {
         if (u.NISN === trxToDelete.NISN_Siswa) {
-          return {
+          const updatedUser = {
             ...u,
             Total_Poin: Math.max(0, u.Total_Poin - trxToDelete.Poin_Didapat)
           };
+          saveUserCloud(updatedUser).catch(console.error);
+          return updatedUser;
         }
         return u;
       });
       setUsers(updatedUsers);
     }
     setTransactions(transactions.filter(t => t.ID_Transaksi !== trxId));
+
+    try {
+      await deleteTransactionCloud(trxId);
+    } catch (err) {
+      console.error('Gagal menghapus transaksi dari Cloud Firestore:', err);
+    }
   };
 
   // Handler: Delete single reward
-  const handleDeleteReward = (rewardId: string) => {
+  const handleDeleteReward = async (rewardId: string) => {
     setRewards(rewards.filter(r => r.RewardID !== rewardId));
+    try {
+      await deleteRewardCloud(rewardId);
+    } catch (err) {
+      console.error('Gagal menghapus reward dari Cloud Firestore:', err);
+    }
   };
 
   // Handler: Delete single redemption log
-  const handleDeleteRedemption = (redemptionId: string) => {
+  const handleDeleteRedemption = async (redemptionId: string) => {
     setRedemptions(redemptions.filter(r => r.ID_Penukaran !== redemptionId));
+    try {
+      await deleteRedemptionCloud(redemptionId);
+    } catch (err) {
+      console.error('Gagal menghapus penukaran dari Cloud Firestore:', err);
+    }
   };
 
   // Handler: Clear entire sheet
-  const handleClearSheet = (sheetName: 'Users' | 'Log_Transaksi' | 'Katalog_Reward' | 'Log_Penukaran') => {
+  const handleClearSheet = async (sheetName: 'Users' | 'Log_Transaksi' | 'Katalog_Reward' | 'Log_Penukaran') => {
     if (sheetName === 'Users') {
       setUsers([]);
     } else if (sheetName === 'Log_Transaksi') {
@@ -277,10 +397,16 @@ export default function App() {
     } else if (sheetName === 'Log_Penukaran') {
       setRedemptions([]);
     }
+
+    try {
+      await clearSheetCloud(sheetName);
+    } catch (err) {
+      console.error(`Gagal mengosongkan sheet ${sheetName} di Cloud Firestore:`, err);
+    }
   };
 
   // Handler: Reset to factory default mock data
-  const handleExecuteReset = () => {
+  const handleExecuteReset = async () => {
     localStorage.removeItem('ecoschool_users');
     localStorage.removeItem('ecoschool_transactions');
     localStorage.removeItem('ecoschool_rewards');
@@ -290,6 +416,12 @@ export default function App() {
     setRewards(INITIAL_REWARDS);
     setRedemptions(INITIAL_REDEMPTIONS);
     setSelectedUser(INITIAL_USERS[0]);
+
+    try {
+      await resetDatabaseCloud();
+    } catch (err) {
+      console.error('Gagal mereset database Cloud Firestore:', err);
+    }
   };
 
   return (
@@ -316,6 +448,7 @@ export default function App() {
           onResetData={() => setIsResetModalOpen(true)}
           totalWeightKg={totalWeightKg}
           selectedUser={selectedUser}
+          isCloudConnected={isCloudConnected}
         />
 
         {/* Scrollable Content */}
@@ -384,7 +517,7 @@ export default function App() {
               {/* Quick Link to Google Sheets Log */}
               <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="text-xs text-slate-600">
-                  Data setoran otomatis tersinkronisasi di <strong className="text-slate-800">Sheet 2 (Log_Transaksi)</strong> Google Sheets.
+                  Data setoran otomatis tersinkronisasi di <strong className="text-slate-800">Sheet 2 (Log_Transaksi)</strong> Google Sheets & Cloud Firestore.
                 </div>
                 <button
                   onClick={() => setActiveTab('sheets')}
@@ -438,6 +571,11 @@ export default function App() {
                 <span className="font-bold text-emerald-800">EcoSchool Bank Sampah</span>
                 <span>•</span>
                 <span>SMAN 2 Banjarmasin</span>
+                <span>•</span>
+                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Cloud Database Firestore Aktif
+                </span>
               </div>
             </div>
           </footer>

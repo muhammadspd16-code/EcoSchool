@@ -8,7 +8,9 @@ import {
   Award,
   Camera,
   QrCode,
-  Smartphone
+  Smartphone,
+  Cloud,
+  Database
 } from 'lucide-react';
 import { User } from '../types';
 import { EcoSchoolLogo } from './EcoSchoolLogo';
@@ -22,6 +24,7 @@ interface HeaderProps {
   onResetData: () => void;
   totalWeightKg: string;
   selectedUser: User;
+  isCloudConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   onResetData,
   totalWeightKg,
   selectedUser,
+  isCloudConnected = true,
 }) => {
   const getTabInfo = () => {
     switch (activeTab) {
@@ -93,9 +97,20 @@ export const Header: React.FC<HeaderProps> = ({
             <EcoSchoolLogo size={42} variant="icon" />
           </div>
           <div className="flex flex-col">
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-              {info.title}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+                {info.title}
+              </h1>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                isCloudConnected 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isCloudConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                <Cloud className="w-3 h-3" />
+                <span className="hidden sm:inline">{isCloudConnected ? 'Cloud Online' : 'Offline'}</span>
+              </span>
+            </div>
             <p className="text-xs text-slate-500 hidden sm:block">
               {today} • SMAN 2 Banjarmasin • <span className="text-emerald-700 font-medium">{info.subtitle}</span>
             </p>
